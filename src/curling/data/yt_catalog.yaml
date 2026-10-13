@@ -1,0 +1,20 @@
+ChaskaCurlingCenter-2025_1:
+  channel: "ChaskaCurlingCenter"
+  title: "Sheet 1 - Shuster v Dropkin - Pancontinental Championship Playdown"
+  url: "https://www.youtube.com/watch?v=YUrQUC_s_X8"
+  date: "2025-08-08"
+  start_time: "00:00:00"
+  end_time: "02:30:00"
+  process:
+    crop:
+      top_view: []
+SeattleCurling-2026_1:
+  channel: "curlingseattlelive"
+  title: "Wysocki (r) vs Neumann (y) - Draw 1 (15:00) - Sheet 1 - 2026 5U National Championship"
+  url: "https://www.youtube.com/watch?v=hG_qz7jvwc0"
+  date: "2026-04-22"
+  start_time: "00:00:00"
+  end_time: "02:00:00"
+  process:
+    crop:
+      top_view: []

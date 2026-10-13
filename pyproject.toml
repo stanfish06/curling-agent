@@ -1,0 +1,30 @@
+[project]
+name = "curling"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Stan", email = "zyyu@umich.edu" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "opencv-python>=5.0.0.93",
+    "pyyaml>=6.0.3",
+    "yt-dlp[default]>=2026.8.19",
+]
+
+[project.scripts]
+curling = "curling:main"
+data = "curling.data:main"
+
+[build-system]
+requires = ["uv_build>=0.12.21,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "lefthook>=2.2.2",
+    "pyright>=1.1.414",
+    "pytest>=9.1.1",
+    "ruff>=0.17.0",
+]

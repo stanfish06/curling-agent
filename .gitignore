@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.lefthook-local.yml
+lefthook-local.yml
+
+data/*
+!data/README.md
+*.part
+*.ytdl
