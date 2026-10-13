@@ -20,7 +20,7 @@ def download_youtube(
     import yt_dlp
 
     ydl_config = {
-        "outtmpl": str(out.resolve() / "%(id)s.%(ext)s"),
+        "outtmpl": str(out.resolve() / "raw.%(ext)s"),
         "merge_output_format": "mp4",
         "format": "bestvideo+bestaudio/best",
         "retries": 10,
