@@ -1,0 +1,8 @@
+<View>
+  <Video name="video" value="$video" framerate="30" height="1000" timelineHeight="320"/>
+  <Labels name="label" toName="video">
+    <Label value="red" background="#e53935"/>
+    <Label value="yellow" background="#fdd835"/>
+  </Labels>
+  <VideoRectangle name="box" toName="video"/>
+</View>

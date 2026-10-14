@@ -1,0 +1,4 @@
+[submodule "src/curling/sim/DigitalCurling"]
+	path = src/curling/sim/DigitalCurling
+	url = https://github.com/digitalcurling/DigitalCurling.git
+	ignore = dirty

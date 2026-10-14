@@ -7,6 +7,15 @@ ChaskaCurlingCenter-2025_1:
   end_time: "02:30:00"
   process:
     crop: [788, 0, 330, 1080]
+  segment:
+    stone_size: [350, 550]
+    sam3:
+      init_trk_keep_alive: 30
+      max_trk_keep_alive: 30
+      new_det_thresh: 0.7
+      hotstart_delay: 15
+      hotstart_unmatch_thresh: 8
+      max_num_objects: 100
 SeattleCurling-2026_1:
   channel: "curlingseattlelive"
   title: "Wysocki (r) vs Neumann (y) - Draw 1 (15:00) - Sheet 1 - 2026 5U National Championship"
@@ -16,3 +25,12 @@ SeattleCurling-2026_1:
   end_time: "02:00:00"
   process:
     crop: [812, 0, 296, 1080]
+  segment:
+    stone_size: [350, 550]
+    sam3:
+      init_trk_keep_alive: 30
+      max_trk_keep_alive: 30
+      new_det_thresh: 0.7
+      hotstart_delay: 15
+      hotstart_unmatch_thresh: 8
+      max_num_objects: 100
