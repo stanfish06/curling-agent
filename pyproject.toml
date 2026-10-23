@@ -19,7 +19,7 @@ dependencies = [
     "scipy>=1.18.1",
     "torch>=2.14.1",
     "torchvision>=0.29.1",
-    "transformers>=5.19.0",
+    "transformers==5.19.0",
     "yt-dlp[default]>=2026.8.19",
 ]
 
@@ -28,6 +28,7 @@ curling = "curling:main"
 data = "curling.data:main"
 train = "curling.model.trainer:main"
 policy = "curling.model.trainer:policy_main"
+estimate = "curling.model.estimate:main"
 
 [build-system]
 requires = ["uv_build>=0.12.21,<0.13.0"]

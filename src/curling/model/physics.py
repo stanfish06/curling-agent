@@ -54,11 +54,175 @@ def in_play(pos: torch.Tensor) -> torch.Tensor:
     )
 
 
-class Physics(nn.Module):
+HEIGHT_UNIT = 1e-3
+
+
+def _param(v, learn: bool, unit: float = 1.0) -> nn.Parameter:
+    return nn.Parameter(
+        torch.tensor(v, dtype=torch.float32) / unit, requires_grad=learn
+    )
+
+
+class Tilt(nn.Module):
     def __init__(
-        self, params: dict[str, float] = FCV1, restitution: float = FCV1_RESTITUTION
+        self, x: float = 0.0, y: float = 0.0, learn: bool = False, unit: float = 1.0
     ):
         super().__init__()
+        self.unit = unit
+        self.slope = _param([x, y], learn, unit)
+
+    def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        return self.unit * (self.slope[0] * x + self.slope[1] * y)
+
+    def grad(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        return self.unit * self.slope.expand(*x.shape, 2)
+
+
+class Bump(nn.Module):
+    def __init__(
+        self,
+        at: list[float],
+        sigma: float,
+        amp: float,
+        learn: bool = False,
+        unit: float = 1.0,
+    ):
+        super().__init__()
+        self.unit = unit
+        self.at = _param(at, learn)
+        self.sigma = _param(sigma, learn)
+        self.amp = _param(amp, learn, unit)
+
+    def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        d2 = (x - self.at[0]) ** 2 + (y - self.at[1]) ** 2
+        return self.unit * self.amp * torch.exp(-d2 / (2 * self.sigma**2))
+
+    def grad(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        d = torch.stack([x - self.at[0], y - self.at[1]], -1)
+        return -self(x, y)[..., None] * d / self.sigma**2
+
+
+class Sink(Bump):
+    def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        return -super().forward(x, y)
+
+
+class Ridge(nn.Module):
+    def __init__(
+        self,
+        axis: str,
+        at: float,
+        width: float,
+        amp: float,
+        learn: bool = False,
+        unit: float = 1.0,
+    ):
+        super().__init__()
+        self.axis = axis
+        self.unit = unit
+        self.at = _param(at, learn)
+        self.width = _param(width, learn)
+        self.amp = _param(amp, learn, unit)
+
+    def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        u = x if self.axis == "y" else y
+        g = torch.exp(-((u - self.at) ** 2) / (2 * self.width**2))
+        return self.unit * self.amp * g
+
+    def grad(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        u = x if self.axis == "y" else y
+        du = -self(x, y) * (u - self.at) / self.width**2
+        zero = torch.zeros_like(du)
+        return torch.stack([du, zero] if self.axis == "y" else [zero, du], -1)
+
+
+class Noise(nn.Module):
+    def __init__(
+        self,
+        seed: int,
+        scale: float,
+        amp: float,
+        n: int = 16,
+        learn: bool = False,
+        unit: float = 1.0,
+    ):
+        super().__init__()
+        self.unit = unit
+        g = torch.Generator().manual_seed(seed)
+        th = torch.rand(n, generator=g) * 2 * torch.pi
+        self.register_buffer("k", torch.stack([th.cos(), th.sin()], -1))
+        self.register_buffer("phi", torch.rand(n, generator=g) * 2 * torch.pi)
+        self.scale = _param(scale, learn)
+        self.amp = _param(amp, learn, unit)
+
+    def phase(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        k = 2 * torch.pi / self.scale * self.k
+        return x[..., None] * k[:, 0] + y[..., None] * k[:, 1] + self.phi
+
+    def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        n = self.k.shape[0]
+        a = self.unit * self.amp * (2 / n) ** 0.5
+        return a * torch.cos(self.phase(x, y)).sum(-1)
+
+    def grad(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        n = self.k.shape[0]
+        k = 2 * torch.pi / self.scale * self.k
+        s = torch.sin(self.phase(x, y))
+        a = self.unit * self.amp * (2 / n) ** 0.5
+        return -a * (s[..., None] * k).sum(-2)
+
+
+PRIMITIVES = {"tilt": Tilt, "bump": Bump, "sink": Sink, "ridge": Ridge, "noise": Noise}
+FIELDS = ("height", "friction", "curl")
+
+
+class Surface(nn.Module):
+    def __init__(self, spec: dict[str, list[dict]] | None = None):
+        super().__init__()
+        spec = spec or {}
+        self.fields = nn.ModuleDict(
+            {
+                f: nn.ModuleList(
+                    [
+                        PRIMITIVES[k](**p, unit=HEIGHT_UNIT if f == "height" else 1.0)
+                        for t in spec.get(f, [])
+                        for k, p in t.items()
+                    ]
+                )
+                for f in FIELDS
+            }
+        )
+
+    def field(self, name: str, pos: torch.Tensor) -> torch.Tensor:
+        x, y = pos[..., 0], pos[..., 1]
+        out = torch.zeros_like(x)
+        for m in self.fields[name]:
+            out = out + m(x, y)
+        return out
+
+    def slope(self, pos: torch.Tensor) -> torch.Tensor:
+        x, y = pos[..., 0], pos[..., 1]
+        out = torch.zeros_like(pos)
+        for m in self.fields["height"]:
+            out = out + m.grad(x, y)
+        return out
+
+    def friction(self, pos: torch.Tensor) -> torch.Tensor:
+        return 1 + self.field("friction", pos)
+
+    def curl(self, pos: torch.Tensor) -> torch.Tensor:
+        return 1 + self.field("curl", pos)
+
+
+class Physics(nn.Module):
+    def __init__(
+        self,
+        params: dict[str, float] = FCV1,
+        restitution: float = FCV1_RESTITUTION,
+        surface: Surface | None = None,
+    ):
+        super().__init__()
+        self.surface = surface or Surface()
         self.log = nn.ParameterDict(
             {k: nn.Parameter(torch.tensor(v).log()) for k, v in params.items()}
         )
@@ -85,13 +249,16 @@ class Physics(nn.Module):
         return self.spin_k / speed.clamp(min=0.001)
 
     def slide(
-        self, vel: torch.Tensor, spin: torch.Tensor, dt: torch.Tensor
+        self, pos: torch.Tensor, vel: torch.Tensor, spin: torch.Tensor, dt: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        vel = vel - G * self.surface.slope(pos) * dt
         speed = vel.norm(dim=-1)
         moving = speed > 1e-7
         s = torch.where(moving, speed, torch.ones_like(speed))
-        new_speed = (speed - self.friction(s) * G * dt).clamp(min=0)
-        yaw = self.yaw_rate(s, spin) * dt
+        new_speed = (
+            speed - self.friction(s) * self.surface.friction(pos) * G * dt
+        ).clamp(min=0)
+        yaw = self.yaw_rate(s, spin) * self.surface.curl(pos) * dt
         e_long = vel / s[..., None]
         e_trans = torch.stack([-e_long[..., 1], e_long[..., 0]], -1)
         new_vel = new_speed[..., None] * (
@@ -162,7 +329,7 @@ class Physics(nn.Module):
         dt: float = DT,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         h = dt * self.time_scale
-        vel, spin = self.slide(vel, spin, h)
+        vel, spin = self.slide(pos, vel, spin, h)
         pos = pos + vel * h
         pos, vel, spin = self.collide(pos, vel, spin, active)
         active = active & ~out_of_sheet(pos)

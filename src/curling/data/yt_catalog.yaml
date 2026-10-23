@@ -8,7 +8,7 @@ ChaskaCurlingCenter-2025_1:
   process:
     crop: [788, 0, 330, 1080]
   segment:
-    stone_size: [350, 550]
+    stone_size: [250, 650]
     sam3:
       init_trk_keep_alive: 30
       max_trk_keep_alive: 30
@@ -26,7 +26,7 @@ SeattleCurling-2026_1:
   process:
     crop: [812, 0, 296, 1080]
   segment:
-    stone_size: [350, 550]
+    stone_size: [250, 650]
     sam3:
       init_trk_keep_alive: 30
       max_trk_keep_alive: 30
